@@ -1,0 +1,126 @@
+{% if model.id %}
+    <select id="{{ id }}_select">
+        <option value="0" disabled="disabled" selected="selected">Выберите объект</option>
+        {% set many = choices|length > 1 %}
+        {% for group in choices %}
+            {% if many %}<optgroup label="{{ group.title }}">{% endif %}
+                {% for key, object in group.objects %}
+                    <option value="{{ key }}">
+                        {{ object }}
+                    </option>
+                {% endfor %}
+            {% if many %}</optgroup>{% endif %}
+        {% endfor %}
+    </select>
+
+    <ul id="{{ id }}_selected_list" class="no-bullet" style="margin: 10px 0"></ul>
+
+    <br/>
+
+    <script>
+        $(function(){
+            var select = '#{{ id }}_select';
+            var list = '#{{ id }}_selected_list';
+            var area = '#{{ id }}';
+            var all = {{ all|raw }};
+            var selected = {{ selected|raw }};
+
+            $(document).on('click', list + ' .icon-trash', function(){
+                var item = $(this).closest('li');
+                toAvail(item.data('pk'));
+                item.remove();
+                save();
+            });
+
+            $(select).on('change', function(){
+                appendValue($(select).val());
+            });
+
+            function reInit()
+            {
+                $(select).val(0);
+            }
+
+            function getOption(pk)
+            {
+                var $result;
+                $(select).find('option').each(function(){
+                    var $option = $(this);
+                    if ($option.attr('value') == pk) {
+                        $result = $option;
+                    }
+                });
+                return $result;
+            }
+
+            function toAvail(pk)
+            {
+                var $option = getOption(pk);
+                if ($option) {
+                    $option.removeAttr('disabled');
+                }
+                reInit();
+            }
+
+            function appendValue(pk, notSave)
+            {
+                var name = getNameByPk(pk);
+                var $option = getOption(pk);
+                if ($option) {
+                    $option.attr('disabled', 'disabled');
+                }
+                reInit();
+                $(list).append(
+                    $('<li data-pk="' + pk +'"> <i class="icon-trash"></i> <i class="icon-move"></i> <span class="name">' + name + '</span></li>')
+                );
+                if (!notSave) {
+                    save();
+                }
+            }
+
+            function getNameByPk(pk)
+            {
+                return all[pk];
+            }
+
+            function initList() {
+                $(list).dragsort({
+                    dragSelector: "li",
+                    placeHolderTemplate: "<li class='empty'></li>",
+                    dragEnd: function() {
+                        save();
+                    }
+                });
+            }
+
+            function save()
+            {
+                var pk = [];
+                $(list).find('li').each(function(){
+                    if ($(this).data('pk')) {
+                        pk.push($(this).data('pk'));
+                    }
+                });
+                $.ajax({
+                    'url': "{% url 'custom_relation:set' %}",
+                    'data': {
+                        pk: {{ model.id }},
+                        modelClass: "{{ model.className()|replace('\\','\\\\') }}",
+                        data: pk,
+                        field: '{{ field }}',
+                        name: '{{ field_name }}'
+                    },
+                    'type': 'post'
+                })
+            }
+
+            for (var key in selected) {
+                var pk = selected[key];
+                appendValue(pk, true);
+            }
+            initList();
+        });
+    </script>
+{% else %}
+    Для редактирования данных сохраните объект
+{% endif %}
